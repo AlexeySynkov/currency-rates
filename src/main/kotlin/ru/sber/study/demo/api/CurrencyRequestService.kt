@@ -8,13 +8,18 @@ import io.restassured.filter.log.LogDetail
 import io.restassured.http.ContentType
 import io.restassured.specification.RequestSpecification
 import org.apache.http.HttpStatus
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.stereotype.Service
 import ru.sber.study.demo.enum.Currency
 
+@Service
 class CurrencyRequestService {
 
-    val rates = "rates"
-    //ключ можно получить при регистрации на currate.ru
-    val apiKey = "cd429f01dce65a113533c9ddc9d29086"
+    @Value("\${curRate.get}")
+    private val get: String = ""
+
+    @Value("\${curRate.apiKey}")
+    private val apiKey: String = ""
 
     private val restAssuredConfig: RestAssuredConfig = RestAssuredConfig.config()
         .logConfig(LogConfig.logConfig().enableLoggingOfRequestAndResponseIfValidationFails(LogDetail.ALL))
@@ -30,8 +35,8 @@ class CurrencyRequestService {
         .config(restAssuredConfig)
 
     //несколько валютных пар передаются через запятую, например: "USDRUB,EURRUB,USDJPY"
-    fun getCurrencyExchangeRate(pairs: Currency): MutableMap<String,String> = startWithRestSpecification()
-        .queryParams(mapOf("get" to rates, "pairs" to pairs.code, "key" to apiKey))
+    fun getCurrencyExchangeRate(pairs: Currency): MutableMap<String, String> = startWithRestSpecification()
+        .queryParams(mapOf("get" to get, "pairs" to pairs.code, "key" to apiKey))
         .get()
         .then()
         .statusCode(HttpStatus.SC_OK)

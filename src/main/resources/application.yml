@@ -1,3 +1,8 @@
 telegram:
   botName: Michael_Creator_test_bot
   token: ${TOKEN}
+
+#Ключ можно получить при регистрации на CurRate.ru
+curRate:
+  get: rates
+  apiKey: ${APIKEY}
