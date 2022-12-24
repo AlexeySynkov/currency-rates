@@ -1,0 +1,3 @@
+telegram:
+  botName: Michael_Creator_test_bot
+  token: ${TOKEN}
