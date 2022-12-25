@@ -46,7 +46,7 @@ class CurrencyRequestService {
 
     // Тут пока просто так вывожу с числом, потому что не знаю, как выглядит мапа и не могу получить курс от getCurrencyExchangeRate
     fun convertSum(sum: String, state: UserState): String {
-        return  when (state) {
+        return when (state) {
 //            UserState.RUB_TO_EUR -> sum.toDouble() * getCurrencyExchangeRate(Currency.RUB)[Currency.EUR.currencyName]!!.toDouble()
             RUB_TO_EUR -> (sum.toDouble() * 70).toString()
             RUB_TO_USD -> (sum.toDouble() * 70).toString()

@@ -1,6 +1,5 @@
 package ru.sber.study.demo.service
 
-import groovy.xml.MarkupBuilder
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
@@ -13,7 +12,6 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.Keyboard
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow
 import ru.sber.study.demo.api.CurrencyRequestService
 import ru.sber.study.demo.enum.Currency
-import ru.sber.study.demo.enum.Currency.*
 import ru.sber.study.demo.enum.UserState
 import ru.sber.study.demo.enum.UserState.CONVERTING
 import ru.sber.study.demo.enum.UserState.STARTED
@@ -21,6 +19,8 @@ import ru.sber.study.demo.repository.UserRepository
 
 const val SHOW_COURSE = "Показать курс валют"
 const val START_CONVERTER = "Конвертер валют"
+const val BACK_TO_START_CONVERTER = "Вернуться к выбору валюты"
+const val BACK_TO_START = "Вернуться в начало"
 const val SUM = "Введите сумму"
 const val RUB_TO_USD = "Перевод рубля в доллар"
 const val USD_TO_RUB = "Перевод доллара в рубли"
@@ -29,13 +29,12 @@ const val JPY_TO_RUB = "Перевод юаня в рубли"
 const val RUB_TO_EUR = "Перевод рубля в евро"
 const val EUR_TO_RUB = "Перевод евро в рубли"
 
-
 @Service
 class CurrencyBot(
     private val currencyService: CurrencyRequestService
 ) : TelegramLongPollingBot() {
 
-    private val convertList = listOf(RUB_TO_USD,USD_TO_RUB, RUB_TO_JPY ,JPY_TO_RUB, RUB_TO_EUR, EUR_TO_RUB)
+    private val convertList = listOf(RUB_TO_USD, USD_TO_RUB, RUB_TO_JPY, JPY_TO_RUB, RUB_TO_EUR, EUR_TO_RUB)
 
     @Autowired
     private lateinit var userRepository: UserRepository
@@ -63,59 +62,93 @@ class CurrencyBot(
 
             val responseText = if (message.hasText()) {
                 when (val messageText = message.text) {
-                    "/start" -> "Добро пожаловать!"
+                    "/start", BACK_TO_START -> "Добро пожаловать!"
                         .also {
                             userRepository.setUserState(chatId, STARTED)
                             keyBoard = ReplyKeyboardMarkup(
-                                listOf(KeyboardRow(
-                                    listOf(KeyboardButton(SHOW_COURSE), KeyboardButton(START_CONVERTER)))))
+                                listOf(
+                                    KeyboardRow(
+                                        listOf(KeyboardButton(SHOW_COURSE), KeyboardButton(START_CONVERTER))
+                                    )
+                                )
+                            )
                         }
 
                     "/get" -> "Получили набор валют"
                         .also {
-                            val currency = currencyService.getCurrencyExchangeRate(RUB)
+                            val currency = currencyService.getCurrencyExchangeRate(Currency.RUB)
                             logger.info(currency.toString())
                         }
 
                     SHOW_COURSE -> "Должны получить набор валют"
 
-                    START_CONVERTER -> "Выберите валюту для конвертации"
+                    START_CONVERTER, BACK_TO_START_CONVERTER -> "Выберите валюту для конвертации"
                         .also {
                             userRepository.setUserState(chatId, CONVERTING)
                             keyBoard = ReplyKeyboardMarkup(
-                                values()
-                                    .filter { it != RUB }
+                                Currency.values()
+                                    .filter { it != Currency.RUB }
                                     .map {
-                                    KeyboardRow(listOf(KeyboardButton(it.currencyName)).toList())
-                                })
+                                        KeyboardRow(listOf(KeyboardButton(it.currencyName)).toList())
+                                    }).also {
+                                it.keyboard.add(
+                                    KeyboardRow(
+                                        listOf(KeyboardButton(BACK_TO_START))
+                                    )
+                                )
+                            }
                         }
 
-                    USD.currencyName -> "Выберите операцию"
+                    Currency.USD.currencyName -> "Выберите операцию"
                         .also {
                             keyBoard = ReplyKeyboardMarkup(
-                                listOf(KeyboardRow(
-                                    listOf(KeyboardButton(RUB_TO_USD), KeyboardButton(USD_TO_RUB)))))
+                                listOf(
+                                    KeyboardRow(
+                                        listOf(KeyboardButton(RUB_TO_USD), KeyboardButton(USD_TO_RUB))
+                                    ),
+                                    KeyboardRow(
+                                        listOf(KeyboardButton(BACK_TO_START_CONVERTER))
+                                    )
+                                )
+                            )
                         }
 
-                    CNY.currencyName -> "Выберите операцию"
+                    Currency.CNY.currencyName -> "Выберите операцию"
                         .also {
                             keyBoard = ReplyKeyboardMarkup(
-                                listOf(KeyboardRow(
-                                    listOf(KeyboardButton(RUB_TO_JPY), KeyboardButton(JPY_TO_RUB)))))
+                                listOf(
+                                    KeyboardRow(
+                                        listOf(KeyboardButton(RUB_TO_JPY), KeyboardButton(JPY_TO_RUB))
+                                    ),
+                                    KeyboardRow(
+                                        listOf(KeyboardButton(BACK_TO_START_CONVERTER))
+                                    )
+                                )
+                            )
                         }
 
-                    EUR.currencyName -> "Выберите операцию"
+                    Currency.EUR.currencyName -> "Выберите операцию"
                         .also {
                             keyBoard = ReplyKeyboardMarkup(
-                                listOf(KeyboardRow(
-                                    listOf(KeyboardButton(RUB_TO_EUR), KeyboardButton(EUR_TO_RUB)))))
+                                listOf(
+                                    KeyboardRow(
+                                        listOf(KeyboardButton(RUB_TO_EUR), KeyboardButton(EUR_TO_RUB))
+                                    ),
+                                    KeyboardRow(
+                                        listOf(KeyboardButton(BACK_TO_START_CONVERTER))
+                                    )
+                                )
+                            )
                         }
 
-                    else ->  {
+                    else -> {
                         if (convertList.contains(messageText)) SUM
                             .also { userRepository.setUserState(chatId, UserState.getByValue(messageText)) }
                         else
-                            if (checkSum(messageText)) currencyService.convertSum(messageText, userRepository.getUserState(chatId))
+                            if (checkSum(messageText)) currencyService.convertSum(
+                                messageText,
+                                userRepository.getUserState(chatId)
+                            )
                             else "Вы написали: *$messageText*"
                     }
                 }

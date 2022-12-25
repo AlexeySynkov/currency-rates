@@ -1,6 +1,6 @@
 package ru.sber.study.demo.enum
 
-enum class UserState (private val value: String = "") {
+enum class UserState(private val value: String = "") {
     NOT_REGISTERED,
     STARTED,
     CONVERTING,
@@ -13,7 +13,7 @@ enum class UserState (private val value: String = "") {
     EUR_TO_RUB("Перевод евро в рубли");
 
     companion object Util {
-        fun getByValue(value : String): UserState {
+        fun getByValue(value: String): UserState {
             return values().findLast { it.value == value } ?: NOT_REGISTERED
         }
     }
