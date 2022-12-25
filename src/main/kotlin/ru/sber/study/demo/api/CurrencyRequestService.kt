@@ -11,6 +11,8 @@ import org.apache.http.HttpStatus
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import ru.sber.study.demo.enum.Currency
+import ru.sber.study.demo.enum.UserState
+import ru.sber.study.demo.enum.UserState.*
 
 @Service
 class CurrencyRequestService {
@@ -41,4 +43,18 @@ class CurrencyRequestService {
         .then()
         .statusCode(HttpStatus.SC_OK)
         .extract().jsonPath().getMap("data")
+
+    // Тут пока просто так вывожу с числом, потому что не знаю, как выглядит мапа и не могу получить курс от getCurrencyExchangeRate
+    fun convertSum(sum: String, state: UserState): String {
+        return  when (state) {
+//            UserState.RUB_TO_EUR -> sum.toDouble() * getCurrencyExchangeRate(Currency.RUB)[Currency.EUR.currencyName]!!.toDouble()
+            RUB_TO_EUR -> (sum.toDouble() * 70).toString()
+            RUB_TO_USD -> (sum.toDouble() * 70).toString()
+            USD_TO_RUB -> (sum.toDouble() * 70).toString()
+            RUB_TO_JPY -> (sum.toDouble() * 70).toString()
+            JPY_TO_RUB -> (sum.toDouble() * 70).toString()
+            EUR_TO_RUB -> (sum.toDouble() * 70).toString()
+            else -> "Не удалось получить курс валют"
+        }
+    }
 }

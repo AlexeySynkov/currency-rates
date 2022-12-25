@@ -22,13 +22,20 @@ import ru.sber.study.demo.repository.UserRepository
 const val SHOW_COURSE = "Показать курс валют"
 const val START_CONVERTER = "Конвертер валют"
 const val SUM = "Введите сумму"
+const val RUB_TO_USD = "Перевод рубля в доллар"
+const val USD_TO_RUB = "Перевод доллара в рубли"
+const val RUB_TO_JPY = "Перевод рубля в юань"
+const val JPY_TO_RUB = "Перевод юаня в рубли"
+const val RUB_TO_EUR = "Перевод рубля в евро"
+const val EUR_TO_RUB = "Перевод евро в рубли"
+
 
 @Service
 class CurrencyBot(
     private val currencyService: CurrencyRequestService
 ) : TelegramLongPollingBot() {
 
-    private val convertList = listOf("Перевод рубля в доллар", "Перевод доллара в рубли","Перевод рубля в юань", "Перевод юаня в рубли", "Перевод рубля в евро", "Перевод евро в рубли")
+    private val convertList = listOf(RUB_TO_USD,USD_TO_RUB, RUB_TO_JPY ,JPY_TO_RUB, RUB_TO_EUR, EUR_TO_RUB)
 
     @Autowired
     private lateinit var userRepository: UserRepository
@@ -87,27 +94,29 @@ class CurrencyBot(
                         .also {
                             keyBoard = ReplyKeyboardMarkup(
                                 listOf(KeyboardRow(
-                                    listOf(KeyboardButton("Перевод рубля в доллар", ), KeyboardButton("Перевод доллара в рубли")))))
+                                    listOf(KeyboardButton(RUB_TO_USD), KeyboardButton(USD_TO_RUB)))))
                         }
 
                     CNY.currencyName -> "Выберите операцию"
                         .also {
                             keyBoard = ReplyKeyboardMarkup(
                                 listOf(KeyboardRow(
-                                    listOf(KeyboardButton("Перевод рубля в юань "), KeyboardButton("Перевод юаня в рубли")))))
+                                    listOf(KeyboardButton(RUB_TO_JPY), KeyboardButton(JPY_TO_RUB)))))
                         }
 
                     EUR.currencyName -> "Выберите операцию"
                         .also {
                             keyBoard = ReplyKeyboardMarkup(
                                 listOf(KeyboardRow(
-                                    listOf(KeyboardButton("Перевод рубля в евро"), KeyboardButton("Перевод евро в рубли")))))
+                                    listOf(KeyboardButton(RUB_TO_EUR), KeyboardButton(EUR_TO_RUB)))))
                         }
 
                     else ->  {
                         if (convertList.contains(messageText)) SUM
+                            .also { userRepository.setUserState(chatId, UserState.getByValue(messageText)) }
                         else
-                            if (checkSum(messageText)) "ТУТ ВЫЗЫВАЕМ СЕРВИС КОНВЕРТАЦИИ" else "Вы написали: *$messageText*"
+                            if (checkSum(messageText)) currencyService.convertSum(messageText, userRepository.getUserState(chatId))
+                            else "Вы написали: *$messageText*"
                     }
                 }
             } else {
