@@ -130,7 +130,18 @@ class CurrencyBotInline(
         messageId: Int? = null
     ) {
         //TODO здесь красиво выводим курсы валют, полученные в переменной currencyInfo
-        val text = "Красиво вывели валюты"
+        var text = ""
+        currencyInfo.map {
+            text = buildString {
+                append(text)
+                append(Currency.valueOf(it.key.toString().substring(0, 3)).emojiCode)
+                append(" ")
+                append(Currency.valueOf(it.key.toString().substring(0, 3)).currencyName)
+                append(" ")
+                append(it.value)
+                append("\n")
+            }
+        }
 
         if (messageId == null) {
             val message = SendMessage().apply {
