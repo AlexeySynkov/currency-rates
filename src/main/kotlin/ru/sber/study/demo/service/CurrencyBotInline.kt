@@ -149,16 +149,17 @@ class CurrencyBotInline(
         currencyInfo: Map<String, String>,
         messageId: Int? = null
     ) {
-        //TODO здесь красиво выводим курсы валют, полученные в переменной currencyInfo
         var text = ""
         currencyInfo.map {
             text = buildString {
                 append(text)
-                append(Currency.valueOf(it.key.toString().substring(0, 3)).emojiCode)
+                append(Currency.valueOf(it.key.substring(0, 3)).emojiCode)
                 append(" ")
-                append(Currency.valueOf(it.key.toString().substring(0, 3)).currencyName)
-                append(" ")
-                append(it.value)
+                append(Currency.valueOf(it.key.substring(0, 3)).currencyName)
+                append("/")
+                append(currency.name)
+                append(" = ")
+                append(format(it.value.toDouble(), 4))
                 append("\n")
             }
         }
