@@ -13,7 +13,6 @@ import org.telegram.telegrambots.meta.api.objects.Update
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton
 import ru.sber.study.demo.api.CurrencyRequestService
-import ru.sber.study.demo.api.CurrencyRequestService.Companion.getCurrencyExchangeRateMock
 import ru.sber.study.demo.enum.Currency
 import ru.sber.study.demo.enum.UserState
 import ru.sber.study.demo.repository.UserRepository
@@ -56,7 +55,13 @@ class CurrencyBotInline(
                         execute(DeleteMessage(chatId.toString(), message.messageId))
                     }
 
-                    else -> execute(DeleteMessage(chatId.toString(), message.messageId))
+                    else -> {
+                        execute(DeleteMessage(chatId.toString(), message.messageId))
+                        if (userRepository.getUserState(chatId) == UserState.CONVERTING) {
+                            checkSum(chatId, message.text)
+                            showConverting(chatId)
+                        }
+                    }
                 }
             }
         } else if (update.hasCallbackQuery()) {
@@ -65,14 +70,38 @@ class CurrencyBotInline(
             if (callback.data != null) {
                 val userData = userRepository.getUserData(chatId)
                 if (userData.state == UserState.STARTED) {
-                    val currency = Currency.valueOf(callback.data)
-                    val currencyInfo = getCurrencyExchangeRateMock(currency)
                     userRepository.setUserState(chatId, UserState.GETTING_COURSES)
+                    val currency = Currency.valueOf(callback.data)
+                    val currencyInfo = currencyService.getCurrencyExchangeRate(currency)
+                    userData.apply {
+                        this.currency = currency
+                        this.currencyInfo = currencyInfo
+                    }
                     showCurrencyInfo(chatId, currency, currencyInfo, userData.botMessageId)
                 } else if (userData.state == UserState.GETTING_COURSES) {
                     if (callback.data == "BACK_TO_CURRENCIES") {
                         userRepository.setUserState(chatId, UserState.STARTED)
+                        userData.apply {
+                            this.currency = null
+                            this.currencyInfo = null
+                        }
                         showCurrencyButtons(chatId, "Выберите валюту", userData.botMessageId)
+                    } else if (callback.data == "CONVERTING") {
+                        userRepository.setUserState(chatId, UserState.CONVERTING)
+                        showConverting(chatId)
+                    }
+                } else if (userData.state == UserState.CONVERTING) {
+                    if (callback.data == "BACK_TO_GETTING_COURSES") {
+                        userRepository.setUserState(chatId, UserState.GETTING_COURSES)
+                        userData.apply {
+                            amount = null
+                            currencyToConvert = null
+                        }
+                        showCurrencyInfo(chatId, userData.currency!!, userData.currencyInfo!!, userData.botMessageId)
+                    } else {
+                        val currencyToConvert = Currency.valueOf(callback.data)
+                        userData.currencyToConvert = currencyToConvert
+                        showConverting(chatId)
                     }
                 }
             }
@@ -87,15 +116,6 @@ class CurrencyBotInline(
             logger.info("Отправлено сообщение: {}", result)
         } catch (e: Exception) {
             logger.error("Ошибка при отправке сообщения", e)
-        }
-    }
-
-    private fun checkSum(string: String): Boolean {
-        return try {
-            string.toDouble()
-            true
-        } catch (e: Exception) {
-            false
         }
     }
 
@@ -148,7 +168,7 @@ class CurrencyBotInline(
                 this.chatId = chatId.toString()
                 this.text = text
                 enableMarkdown(true)
-                replyMarkup = createConvertButtons(currency)
+                replyMarkup = createCoursesButtons(currency)
             }
             val result = execute(message)
             logger.info("Отправлено сообщение: {}", result)
@@ -159,7 +179,50 @@ class CurrencyBotInline(
                 this.messageId = messageId
                 this.text = text
                 enableMarkdown(true)
-                replyMarkup = createConvertButtons(currency)
+                replyMarkup = createCoursesButtons(currency)
+            }
+            execute(message)
+            logger.info("Изменено сообщение: {}", message)
+        }
+    }
+
+    private fun showConverting(chatId: Long) {
+        val userData = userRepository.getUserData(chatId)
+        if (userData.currency == null || userData.currencyInfo == null) {
+            sendNotification(chatId, "/start")
+        }
+
+        val text = if (userData.amount == null) {
+            "Введите сумму валюты \"${userData.currency!!.currencyName}\" ${userData.currency!!.emojiCode}"
+        } else {
+            if (userData.currencyToConvert == null) {
+                "${userData.currency!!.emojiCode} ${format(userData.amount!!, 4)}\n" +
+                        "Выберите валюту, в которую нужно конвертировать"
+            } else {
+                val course =
+                    userData.currencyInfo!!["${userData.currencyToConvert}${userData.currency}"]!!.toDouble()
+                "${userData.currency!!.emojiCode} ${format(userData.amount!!, 4)} = " +
+                        "${userData.currencyToConvert!!.emojiCode} ${format(userData.amount!! / course, 4)}"
+            }
+        }
+
+        if (userData.botMessageId == null) {
+            val message = SendMessage().apply {
+                this.chatId = chatId.toString()
+                this.text = text
+                enableMarkdown(true)
+                replyMarkup = createConvertButtons(chatId, userData.amount)
+            }
+            val result = execute(message)
+            logger.info("Отправлено сообщение: {}", result)
+            userRepository.getUserData(chatId).botMessageId = result.messageId
+        } else {
+            val message = EditMessageText().apply {
+                this.chatId = chatId.toString()
+                this.messageId = userData.botMessageId
+                this.text = text
+                enableMarkdown(true)
+                replyMarkup = createConvertButtons(chatId, userData.amount)
             }
             execute(message)
             logger.info("Изменено сообщение: {}", message)
@@ -183,7 +246,7 @@ class CurrencyBotInline(
         return replyKeyboardMarkup
     }
 
-    private fun createConvertButtons(currency: Currency): InlineKeyboardMarkup {
+    private fun createCoursesButtons(currency: Currency): InlineKeyboardMarkup {
         val replyKeyboardMarkup = InlineKeyboardMarkup()
 
         val buttonConvertCurrency = InlineKeyboardButton().apply {
@@ -199,4 +262,52 @@ class CurrencyBotInline(
         replyKeyboardMarkup.keyboard = listOf(listOf(buttonConvertCurrency), listOf(buttonBackToCurrencies))
         return replyKeyboardMarkup
     }
+
+    private fun createConvertButtons(chatId: Long, amount: Double?): InlineKeyboardMarkup {
+        val userData = userRepository.getUserData(chatId)
+
+        val replyKeyboardMarkup = InlineKeyboardMarkup()
+
+        var currencyButtonList: List<InlineKeyboardButton>? = null
+        if (amount != null) {
+            currencyButtonList = Currency.values()
+                .filter {
+                    it != userData.currency && it != userData.currencyToConvert
+                }
+                .map { currency ->
+                    InlineKeyboardButton().apply {
+                        text = "${currency.emojiCode} ${currency.currencyName}"
+                        callbackData = currency.name
+                    }
+                }
+        }
+
+        val buttonBackToCurrencies = InlineKeyboardButton().apply {
+            text = "Вернуться к курсам ${userData.currency!!.emojiCode}"
+            callbackData = "BACK_TO_GETTING_COURSES"
+        }
+
+        if (currencyButtonList != null) {
+            replyKeyboardMarkup.keyboard = listOf(currencyButtonList, listOf(buttonBackToCurrencies))
+        } else {
+            replyKeyboardMarkup.keyboard = listOf(listOf(buttonBackToCurrencies))
+        }
+
+        return replyKeyboardMarkup
+    }
+
+    private fun checkSum(chatId: Long, text: String): Boolean {
+        val userData = userRepository.getUserData(chatId)
+        return try {
+            userData.amount = text.toDouble()
+            true
+        } catch (e: Exception) {
+            logger.error("Пользователь неправильно указал число", e)
+            userData.amount = null
+            userData.currencyToConvert = null
+            false
+        }
+    }
+
+    fun format(input: Double, scale: Int) = "%.${scale}f".format(input)
 }
