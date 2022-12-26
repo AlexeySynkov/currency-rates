@@ -3,6 +3,7 @@ package ru.sber.study.demo.service
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Service
 import org.telegram.telegrambots.bots.TelegramLongPollingBot
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
@@ -30,6 +31,7 @@ const val RUB_TO_EUR = "Перевод рубля в евро"
 const val EUR_TO_RUB = "Перевод евро в рубли"
 
 @Service
+@Profile("!michael")
 class CurrencyBot(
     private val currencyService: CurrencyRequestService
 ) : TelegramLongPollingBot() {
@@ -86,17 +88,21 @@ class CurrencyBot(
                         .also {
                             userRepository.setUserState(chatId, CONVERTING)
                             keyBoard = ReplyKeyboardMarkup(
-                                Currency.values()
-                                    .filter { it != Currency.RUB }
-                                    .map {
-                                        KeyboardRow(listOf(KeyboardButton(it.currencyName)).toList())
-                                    }).also {
-                                it.keyboard.add(
-                                    KeyboardRow(
-                                        listOf(KeyboardButton(BACK_TO_START))
-                                    )
+                                mutableListOf(KeyboardRow(
+                                    Currency.values()
+                                        .filter { currency -> currency != Currency.RUB }
+                                        .map { currency -> KeyboardButton(currency.currencyName) }
+                                        .toList()
                                 )
-                            }
+                                )
+                            )
+                                .also {
+                                    it.keyboard.add(
+                                        KeyboardRow(
+                                            listOf(KeyboardButton(BACK_TO_START))
+                                        )
+                                    )
+                                }
                         }
 
                     Currency.USD.currencyName -> "Выберите операцию"

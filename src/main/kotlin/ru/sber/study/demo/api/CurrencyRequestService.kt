@@ -17,6 +17,14 @@ import ru.sber.study.demo.enum.UserState.*
 @Service
 class CurrencyRequestService {
 
+    companion object {
+        fun getCurrencyExchangeRateMock(pairs: Currency): MutableMap<String, String> = mutableMapOf(
+            "USDRUB" to "64.1824",
+            "EURRUB" to "69.244",
+            "CNYRUB" to "9.13811"
+        )
+    }
+
     @Value("\${curRate.get}")
     private val get: String = ""
 
