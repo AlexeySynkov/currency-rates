@@ -18,7 +18,7 @@ import ru.sber.study.demo.enum.UserState
 import ru.sber.study.demo.repository.UserRepository
 
 @Service
-@Profile("michael")
+@Profile("default")
 class CurrencyBotInline(
     private val currencyService: CurrencyRequestService
 ) : TelegramLongPollingBot() {
@@ -50,7 +50,13 @@ class CurrencyBotInline(
 
             if (message.hasText()) {
                 when (message.text) {
-                    "/start" -> showCurrencyButtons(chatId, "Выберите валюту").also {
+                    "/start" -> {
+                        val userData = userRepository.getUserData(chatId)
+                        if (userData.botMessageId != null) {
+                            execute(DeleteMessage(chatId.toString(), userData.botMessageId!!))
+                            userData.botMessageId = null
+                        }
+                        showCurrencyButtons(chatId, "Выберите валюту")
                         userRepository.setUserState(chatId, UserState.STARTED)
                         execute(DeleteMessage(chatId.toString(), message.messageId))
                     }
@@ -77,7 +83,7 @@ class CurrencyBotInline(
                         this.currency = currency
                         this.currencyInfo = currencyInfo
                     }
-                    showCurrencyInfo(chatId, currency, currencyInfo, userData.botMessageId)
+                    showCurrencyInfo(chatId)
                 } else if (userData.state == UserState.GETTING_COURSES) {
                     if (callback.data == "BACK_TO_CURRENCIES") {
                         userRepository.setUserState(chatId, UserState.STARTED)
@@ -85,7 +91,7 @@ class CurrencyBotInline(
                             this.currency = null
                             this.currencyInfo = null
                         }
-                        showCurrencyButtons(chatId, "Выберите валюту", userData.botMessageId)
+                        showCurrencyButtons(chatId, "Выберите валюту")
                     } else if (callback.data == "CONVERTING") {
                         userRepository.setUserState(chatId, UserState.CONVERTING)
                         showConverting(chatId)
@@ -97,7 +103,7 @@ class CurrencyBotInline(
                             amount = null
                             currencyToConvert = null
                         }
-                        showCurrencyInfo(chatId, userData.currency!!, userData.currencyInfo!!, userData.botMessageId)
+                        showCurrencyInfo(chatId)
                     } else {
                         val currencyToConvert = Currency.valueOf(callback.data)
                         userData.currencyToConvert = currencyToConvert
@@ -119,8 +125,9 @@ class CurrencyBotInline(
         }
     }
 
-    private fun showCurrencyButtons(chatId: Long, text: String, messageId: Int? = null) {
-        if (messageId == null) {
+    private fun showCurrencyButtons(chatId: Long, text: String) {
+        val userData = userRepository.getUserData(chatId)
+        if (userData.botMessageId == null) {
             val message = SendMessage().apply {
                 this.chatId = chatId.toString()
                 this.text = text
@@ -133,7 +140,7 @@ class CurrencyBotInline(
         } else {
             val message = EditMessageText().apply {
                 this.chatId = chatId.toString()
-                this.messageId = messageId
+                this.messageId = userData.botMessageId
                 this.text = text
                 enableMarkdown(true)
                 replyMarkup = createCurrencyButtons()
@@ -143,33 +150,30 @@ class CurrencyBotInline(
         }
     }
 
-    private fun showCurrencyInfo(
-        chatId: Long,
-        currency: Currency,
-        currencyInfo: Map<String, String>,
-        messageId: Int? = null
-    ) {
+    private fun showCurrencyInfo(chatId: Long) {
+        val userData = userRepository.getUserData(chatId)
+
         var text = ""
-        currencyInfo.map {
+        userData.currencyInfo!!.map {
             text = buildString {
                 append(text)
                 append(Currency.valueOf(it.key.substring(0, 3)).emojiCode)
                 append(" ")
                 append(Currency.valueOf(it.key.substring(0, 3)).currencyName)
                 append("/")
-                append(currency.name)
+                append(userData.currency!!.name)
                 append(" = ")
                 append(format(it.value.toDouble(), 4))
                 append("\n")
             }
         }
 
-        if (messageId == null) {
+        if (userData.botMessageId == null) {
             val message = SendMessage().apply {
                 this.chatId = chatId.toString()
                 this.text = text
                 enableMarkdown(true)
-                replyMarkup = createCoursesButtons(currency)
+                replyMarkup = createCoursesButtons(userData.currency!!)
             }
             val result = execute(message)
             logger.info("Отправлено сообщение: {}", result)
@@ -177,10 +181,10 @@ class CurrencyBotInline(
         } else {
             val message = EditMessageText().apply {
                 this.chatId = chatId.toString()
-                this.messageId = messageId
+                this.messageId = userData.botMessageId
                 this.text = text
                 enableMarkdown(true)
-                replyMarkup = createCoursesButtons(currency)
+                replyMarkup = createCoursesButtons(userData.currency!!)
             }
             execute(message)
             logger.info("Изменено сообщение: {}", message)
@@ -300,12 +304,10 @@ class CurrencyBotInline(
     private fun checkSum(chatId: Long, text: String): Boolean {
         val userData = userRepository.getUserData(chatId)
         return try {
-            userData.amount = text.toDouble()
+            userData.amount = text.replace(",", ".").toDouble()
             true
         } catch (e: Exception) {
             logger.error("Пользователь неправильно указал число", e)
-            userData.amount = null
-            userData.currencyToConvert = null
             false
         }
     }

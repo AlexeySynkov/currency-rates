@@ -31,7 +31,7 @@ const val RUB_TO_EUR = "Перевод рубля в евро"
 const val EUR_TO_RUB = "Перевод евро в рубли"
 
 @Service
-@Profile("!michael")
+@Profile("usual_buttons")
 class CurrencyBot(
     private val currencyService: CurrencyRequestService
 ) : TelegramLongPollingBot() {
