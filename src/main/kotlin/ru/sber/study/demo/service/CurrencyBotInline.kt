@@ -159,7 +159,7 @@ class CurrencyBotInline(
                 append(text)
                 append(Currency.valueOf(it.key.substring(0, 3)).emojiCode)
                 append(" ")
-                append(Currency.valueOf(it.key.substring(0, 3)).currencyName)
+                append(Currency.valueOf(it.key.substring(0, 3)).name)
                 append("/")
                 append(userData.currency!!.name)
                 append(" = ")
